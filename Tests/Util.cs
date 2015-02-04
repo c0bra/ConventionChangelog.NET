@@ -23,23 +23,15 @@ namespace Tests
 
         public static Repository InitTestRepo()
         {
-            if (Directory.Exists(EMPTY_REPO_DIR))
+            if (Directory.Exists(TEST_REPO_DIR))
             {
-                CleanupRepo(EMPTY_REPO_DIR);
+                CleanupRepo(TEST_REPO_DIR);
             }
 
             Directory.CreateDirectory(TEST_REPO_DIR);
             Repository.Init(TEST_REPO_DIR);
 
-            string readmePath = Path.Combine(TEST_REPO_DIR, "README.md");
-
-            File.WriteAllText(readmePath, "This is a test repo");
-
             Repository repo = new Repository(TEST_REPO_DIR);
-
-            repo.Index.Add("README.md");
-
-            repo.Commit("Initial commit");
 
             return repo;
         }
@@ -67,7 +59,11 @@ namespace Tests
                     info.Attributes = FileAttributes.Normal;
                 }
 
-                directory.Delete(true);
+                try
+                {
+                    directory.Delete(true);
+                }
+                catch (Exception) { }
             }
         }
 
