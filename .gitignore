@@ -180,4 +180,5 @@ UpgradeLog*.htm
 *.bim_*.settings
 
 # Microsoft Fakes
+
 FakesAssemblies/
