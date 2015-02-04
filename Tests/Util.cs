@@ -39,6 +39,7 @@ namespace Tests
             Repository repo = new Repository(TEST_REPO_DIR);
 
             repo.Config.Set("user.name", "test", ConfigurationLevel.Local);
+            repo.Config.Set("user.name", "blah@blah.bl", ConfigurationLevel.Local);
 
             return repo;
         }
@@ -87,6 +88,7 @@ namespace Tests
             Repository repo = new Repository(EMPTY_REPO_DIR);
 
             repo.Config.Set("user.name", "test", ConfigurationLevel.Local);
+            repo.Config.Set("user.name", "blah@blah.bl", ConfigurationLevel.Local);
 
             return repo;
         }
