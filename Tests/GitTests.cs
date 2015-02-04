@@ -31,6 +31,8 @@ namespace Tests
         [Test]
         public void GetFirstCommit_RepoWithCommitReturnsEmptyString()
         {
+            InitialCommit();
+
             var firstCommit = git.GetFirstCommit();
 
             Assert.NotNull(firstCommit);
@@ -40,13 +42,9 @@ namespace Tests
         [Test]
         public void RawCommit_ParsesBasicCommit()
         {
+            InitialCommit();
+
             string readmePath = Path.Combine(Util.TEST_REPO_DIR, "README.md");
-
-            File.WriteAllText(readmePath, "This is a test repo");
-
-            repo.Index.Add("README.md");
-
-            repo.Commit("Initial commit");
 
             File.WriteAllText(readmePath, "Updating readme");
             repo.Index.Add("README.md");
@@ -64,6 +62,17 @@ namespace Tests
             Assert.AreEqual("feat", commit.type);
             Assert.True(commit.breaks.Count == 0);
             Assert.True(commit.closes.Count == 0);
+        }
+
+        public void InitialCommit()
+        {
+            string readmePath = Path.Combine(Util.TEST_REPO_DIR, "README.md");
+
+            File.WriteAllText(readmePath, "This is a test repo");
+
+            repo.Index.Add("README.md");
+
+            repo.Commit("Initial commit");
         }
     }
 }

@@ -13,6 +13,11 @@ namespace Tests
         public static string TEST_REPO_DIR { get { return "test_repo"; } }
         public static string EMPTY_REPO_DIR { get { return "empty_repo"; } }
 
+        public static void InitUser()
+        {
+            
+        }
+
         public static void InitAll()
         {
             CleanupRepos();
@@ -32,6 +37,8 @@ namespace Tests
             Repository.Init(TEST_REPO_DIR);
 
             Repository repo = new Repository(TEST_REPO_DIR);
+
+            repo.Config.Set("user.name", "test", ConfigurationLevel.Local);
 
             return repo;
         }
@@ -78,6 +85,9 @@ namespace Tests
             Repository.Init(EMPTY_REPO_DIR);
 
             Repository repo = new Repository(EMPTY_REPO_DIR);
+
+            repo.Config.Set("user.name", "test", ConfigurationLevel.Local);
+
             return repo;
         }
     }
