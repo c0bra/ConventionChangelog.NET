@@ -57,7 +57,7 @@ namespace ConventionalChangelog
             {
                 hash = GitCommand(@"rev-list --tags --max-count=1").Trim();
             }
-            catch (GitException ex)
+            catch (GitException)
             {
                 return GetFirstCommit();
             }
