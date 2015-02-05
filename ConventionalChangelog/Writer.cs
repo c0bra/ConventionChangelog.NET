@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -18,26 +19,26 @@ namespace ConventionalChangelog
         internal static readonly string EMPTY_COMPONENT = "$$";
         internal static readonly string HEADER_TPL = "<a name=\"{0}\"></a>\n{1} ({2})\n\n";
 
-        public string GetVersion(string version, string subtitle)
+        internal static string GetVersion(string version, string subtitle)
         {
             subtitle = !String.IsNullOrEmpty(subtitle) ? " " + subtitle : "";
             return String.Format(VERSION, version, subtitle);
         }
-
-        public string GetPatchVersion(string version, string subtitle)
+        
+        internal static string GetPatchVersion(string version, string subtitle)
         {
             subtitle = !String.IsNullOrEmpty(subtitle) ? " " + subtitle : "";
             return String.Format(PATCH_VERSION, version, subtitle);
         }
-
-        public string GetIssueLink(string repository, string issue)
+        
+        internal static string GetIssueLink(string repository, string issue)
         {
             return !String.IsNullOrEmpty(repository) ?
                 String.Format(LINK_ISSUE, issue, repository, issue) :
                 String.Format(ISSUE, issue);
         }
 
-        public string GetCommitLink(string repository, string hash)
+        internal static string GetCommitLink(string repository, string hash)
         {
             string shortHash = hash.Substring(0, 8);
             return !String.IsNullOrEmpty(repository) ?
@@ -45,13 +46,18 @@ namespace ConventionalChangelog
                 String.Format(COMMIT, shortHash);
         }
 
-        public Stream WriteLog(List<CommitMessage> commits)
+        public string WriteLog(List<CommitMessage> commits, WriterOptions options)
         {
             //Dictionary<string, List<CommitMessage>> sections = new Dictionary<string, List<CommitMessage>>() {
             //    { "fix", new List<CommitMessage>() },
             //    { "feat", new List<CommitMessage>() },
             //    { "breaks", new List<CommitMessage>() }
             //};
+
+            if (options == null)
+            {
+                options = new WriterOptions();
+            }
 
             Sections sections = new Sections();
 
@@ -63,7 +69,7 @@ namespace ConventionalChangelog
                 if (sections.TryGetSection(commit.Type, out section))
                 {
                     {
-                        section.Add(commit.Component, commit);
+                        section.Add(component, commit);
                     }
                 }
 
@@ -73,7 +79,7 @@ namespace ConventionalChangelog
                 }
             }
 
-            Writer writer = new Writer();
+            SectionWriter writer = new SectionWriter(options);
             
             /*
             writer.header(options.version);
@@ -83,19 +89,38 @@ namespace ConventionalChangelog
             writer.end();
             */
 
-            return writer.Stream;
+            writer.Header(options.Version);
+            writer.Section("Bug Fixes", sections.Fixes);
+            writer.Section("Features", sections.Feats);
+            writer.Section("Breaking Changes", sections.Breaks);
+
+            return writer.SectionLog.ToString();
         }
     }
 
-    private class SectionWriter
-    {
-        public Stream Stream { get; set; }
+    public class WriterOptions {
+        public Func<string, string> IssueLink { get; set; }
+        public Func<string, string> CommitLink { get; set; }
+        public string Version { get; set; }
+        public string Repository { get; set; }
+        public string Subtitle { get; set; }
 
-        public SectionWriter() {
-            new SectionWriter(new MemoryStream());
+        public WriterOptions()
+        {
+            IssueLink = (Func<string, string>)((issue) => { return Writer.GetIssueLink(Repository, issue); });
+            CommitLink = (Func<string, string>)((commit) => { return Writer.GetCommitLink(Repository, commit); });
         }
+    }
 
-        public SectionWriter(Stream stream)
+    internal class SectionWriter
+    {
+        public StringBuilder SectionLog { get; set; }
+        private WriterOptions Options { get; set; }
+
+        #region constructors
+        public SectionWriter(WriterOptions options) : this(new StringBuilder(), options) { }
+
+        public SectionWriter(StringBuilder sectionLog, WriterOptions options)
         {
             /* options = extend({
                 versionText: getVersion,
@@ -104,7 +129,70 @@ namespace ConventionalChangelog
                 commitLink: getCommitLink.bind(null, options.repository)
               }, options || {}); */
 
-            this.Stream = stream;
+            this.SectionLog = sectionLog;
+            this.Options = options;
+
+            if (Options.IssueLink == null) Options.IssueLink = (Func<string, string>)((issue) => { return Writer.GetIssueLink(this.Options.Repository, issue); });
+            if (Options.CommitLink == null) Options.CommitLink = (Func<string, string>)((commit) => { return Writer.GetCommitLink(this.Options.Repository, commit); });
+            /* TODO: Add getVersion and getPatchVersion?? */
+        }
+        #endregion
+
+        public void Header(string version)
+        {
+            version = version ?? "";
+            string subtitle = Options.Subtitle ?? "";
+            string versionText = (version.Split('.').Length >= 3 && version.Split('.')[2] == "0") ?
+                Writer.GetVersion(version, subtitle) :
+                Writer.GetPatchVersion(version, subtitle);
+            
+            SectionLog.Append(String.Format(Writer.HEADER_TPL, version, versionText, DateTime.Now.ToString("yyyy-MM-dd")));
+        }
+
+        public void Section(string title, Section section)
+        {
+            if (section.Messages.Count == 0) { return; }
+
+            SectionLog.Append(String.Format("\n#### {0}\n\n", title));
+
+            foreach (KeyValuePair<string, List<CommitMessage>> entry in section.Messages)
+            {
+                string componentName = entry.Key;
+                List<CommitMessage> messages = entry.Value;
+
+                string prefix = "*";
+                bool nested = section.Messages.Count > 1;
+
+                if (componentName != Writer.EMPTY_COMPONENT)
+                {
+                    if (nested)
+                    {
+                        SectionLog.Append(String.Format("* **{0}:**\n", componentName));
+                        prefix = "  *";
+                    }
+                    else
+                    {
+                        prefix = String.Format("* **{0}:**", componentName);
+                    }
+                }
+
+                foreach (var message in messages)
+                {
+                    SectionLog.Append(String.Format(
+                        "{0} {1} ({2}",
+                        prefix, message.Subject, this.Options.CommitLink.Invoke(message.Hash)
+                    ));
+
+                    if (message.Closes.Count > 0)
+                    {
+                        SectionLog.Append(", closes " + String.Join(", ", message.Closes.Select(x => this.Options.IssueLink.Invoke(x))));
+                    }
+
+                    SectionLog.Append(")\n");
+                }
+            }
+
+            SectionLog.Append("\n");
         }
     }
 
@@ -151,16 +239,16 @@ namespace ConventionalChangelog
     {
         //public List<CommitMessage> Messages { get; set; }
         public Dictionary<string, List<CommitMessage>> Messages;
-        private string name;
+        public string Name { get; set; }
 
         public Section(string Name)
         {
-            this.name = Name;
+            this.Name = Name;
             Messages = new Dictionary<string, List<CommitMessage>>();
         }
 
         public void Add(string name, CommitMessage message) {
-            if (Messages[name] == null) Messages[name] = new List<CommitMessage>();
+            if (!Messages.ContainsKey(name)) Messages.Add(name, new List<CommitMessage>());
             Messages[name].Add(message);
         }
     }
