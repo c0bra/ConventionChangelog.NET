@@ -17,6 +17,8 @@ namespace Tests
         public void Setup()
         {
             Util.InitEmptyRepo();
+
+            git = new Git(Util.EMPTY_REPO_DIR);
         }
 
         [TearDown]
@@ -28,14 +30,21 @@ namespace Tests
         [Test]
         public void GetFirstCommit_NoCommitsThrowsError()
         {
-            git = new Git(Util.EMPTY_REPO_DIR);
-
-            Exception ex = Assert.Throws<GitException>(() =>
+            GitException ex = Assert.Throws<GitException>(() =>
             {
                 git.GetFirstCommit();
             });
 
             Assert.True(ex.Message.ToLower().Contains("no commits found"));
+        }
+
+        [Test]
+        public void LatestTag_WithNoCommitsThrows()
+        {
+            Assert.Throws<GitException>(() =>
+            {
+                git.LatestTag();
+            });
         }
     }
 }

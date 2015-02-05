@@ -11,8 +11,8 @@ namespace ConventionalChangelog
 {
     public class Git
     {
-        const string COMMIT_PATTERN = @"^(\w*)(\(([\w\$\.\-\* ]*)\))?\: (.*)$";
-        const int MAX_SUBJECT_LENGTH = 80;
+        private static readonly string COMMIT_PATTERN = @"^(\w*)(\(([\w\$\.\-\* ]*)\))?\: (.*)$";
+        private static readonly int MAX_SUBJECT_LENGTH = 80;
 
         private string _repoDir = ".";
 
@@ -41,9 +41,9 @@ namespace ConventionalChangelog
 
             process.WaitForExit();
 
-            if (process.ExitCode == 1)
+            if (process.ExitCode != 0)
             {
-                throw new Exception(String.Format("Error running git commit: {0}", process.StandardError.ReadToEnd()));
+                throw new GitException(String.Format("Error running git commit: {0}", process.StandardError.ReadToEnd()));
             }
 
             return output;
@@ -51,21 +51,48 @@ namespace ConventionalChangelog
 
         public string LatestTag()
         {
+            // Get commit hash for latest tag
+            string hash;
             try
             {
-                var ret = GitCommand(@"describe --tags `git rev-list --tags --max-count=1`").Trim();
+                hash = GitCommand(@"rev-list --tags --max-count=1").Trim();
+            }
+            catch (GitException ex)
+            {
+                return GetFirstCommit();
+            }
+
+            try
+            {
+                string cmd = String.Format("describe --tags {0}", hash);
+
+                var ret = GitCommand(cmd).Trim();
                 return ret;
             }
-            catch (Exception)
+            catch (GitException)
             {
-                var ret = GitCommand(@"");
-                return ret;
+                return GetFirstCommit();
             }
         }
 
         public string GetFirstCommit()
         {
-            string ret = GitCommand("log --format=\"%H\" --pretty=oneline --reverse").Trim();
+            string ret;
+            try
+            {
+                ret = GitCommand("log --format=\"%H\" --pretty=oneline --reverse").Trim();
+            }
+            catch (GitException ex)
+            {
+                if (ex.Message.ToLower().Contains("bad default revision 'head'"))
+                {
+                    throw new GitException("No commits found", ex);
+                }
+                else
+                {
+                    throw ex;
+                }
+            }
 
             if (String.IsNullOrEmpty(ret))
             {
@@ -109,37 +136,37 @@ namespace ConventionalChangelog
             var lines = raw.Split('\n').ToList();
             var msg = new CommitMessage();
 
-            msg.hash = lines.First(); lines.RemoveAt(0);
-            msg.subject = lines.First(); lines.RemoveAt(0);
+            msg.Hash = lines.First(); lines.RemoveAt(0);
+            msg.Subject = lines.First(); lines.RemoveAt(0);
 
-            Regex closesRE = new Regex(@"/\s*(?:Closes|Fixes|Resolves)\s#(?<issue>\d+)/ig");
+            Regex closesRE = new Regex(@"\s*(?:Clos(?:es|ed)|Fix(?:es|ed)|Resolv(?:es|ed))\s#(?<issue>\d+)", RegexOptions.IgnoreCase | RegexOptions.Multiline);
 
-            msg.closes = closesRE.Matches(msg.subject)
+            msg.Closes = closesRE.Matches(msg.Subject)
                             .Cast<Match>()
                             .Select(x => x.Groups["issue"].Value)
                             .ToList();
 
             // Remove closes from subject
-            msg.subject = closesRE.Replace(msg.subject, "");
-            
-            var lineRE = new Regex(@"(/(?:Closes|Fix(?:es|ed)|Resolves)\s(?<issues>(?:#\d+(?:\,\s)?)+)/ig)");
-            string issueRE = @"/\d+/";
+            msg.Subject = closesRE.Replace(msg.Subject, "");
+
+            var lineRE = new Regex(@"(?:Clos(?:es|ed)|Fix(?:es|ed)|Resolv(?:es|ed))\s(?<issues>(?:#\d+(?:\,\s)?)+)", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+            string issueRE = @"\d+";
             foreach (var line in lines)
             {
                 lineRE.Matches(line)
-                    .Cast<Match>()
-                    .Select(x => x.Groups["issues"].Value)
-                    .ToList()
-                    .ForEach(x =>
-                    {
-                        x.Split(',').Select(i => i.Trim())
-                            .ToList()
-                            .ForEach(i =>
-                            {
-                                var issue = Regex.Match(i, issueRE);
-                                if (issue != null) msg.closes.Add(issue.Value);
-                            });
-                    });
+                 .Cast<Match>()
+                 .Select(x => x.Groups["issues"].Value)
+                 .ToList()
+                 .ForEach(x =>
+                 {
+                     x.Split(',').Select(i => i.Trim())
+                         .ToList()
+                         .ForEach(i =>
+                         {
+                             var issue = Regex.Match(i, issueRE);
+                             if (!String.IsNullOrEmpty(issue.Value)) msg.Closes.Add(issue.Value);
+                         });
+                 });
             }
 
             var breaksRE = new Regex(@"/BREAKING CHANGE:\s(?<break>[\s\S]*)/");
@@ -147,12 +174,12 @@ namespace ConventionalChangelog
             var breakmatch = breaksRE.Match(raw).Groups["break"].Value;
             if (!String.IsNullOrEmpty(breakmatch))
             {
-                msg.breaks.Add(breakmatch);
+                msg.Breaks.Add(breakmatch);
             }
 
-            msg.body = String.Join("\n", lines);
+            msg.Body = String.Join("\n", lines);
 
-            var match = (new Regex(COMMIT_PATTERN)).Match(msg.subject);
+            var match = (new Regex(COMMIT_PATTERN)).Match(msg.Subject);
             if (!match.Success || match.Groups[1] == null || match.Groups[4] == null)
             {
                 return null;
@@ -165,9 +192,9 @@ namespace ConventionalChangelog
                 subject = subject.Substring(0, MAX_SUBJECT_LENGTH);
             }
 
-            msg.type = match.Groups[1].Value;
-            msg.component = match.Groups[3].Value;
-            msg.subject = subject;
+            msg.Type = match.Groups[1].Value;
+            msg.Component = match.Groups[3].Value;
+            msg.Subject = subject;
 
             return msg;
         }
@@ -190,24 +217,24 @@ namespace ConventionalChangelog
 
     public class CommitMessage
     {
-        public string hash { get; set; }
-        public string subject { get; set; }
-        public string body { get; set; }
-        public string component { get; set; }
-        public string type { get; set; }
-        public List<string> closes { get; set; }
-        public List<string> breaks { get; set; }
+        public string Hash { get; set; }
+        public string Subject { get; set; }
+        public string Body { get; set; }
+        public string Component { get; set; }
+        public string Type { get; set; }
+        public List<string> Closes { get; set; }
+        public List<string> Breaks { get; set; }
 
         public CommitMessage()
         {
-            closes = new List<string>();
-            breaks = new List<string>();
+            Closes = new List<string>();
+            Breaks = new List<string>();
         }
 
         public CommitMessage(string hash, string subject)
         {
-            this.hash = hash;
-            this.subject = subject;
+            this.Hash = hash;
+            this.Subject = subject;
         }
     }
 }
