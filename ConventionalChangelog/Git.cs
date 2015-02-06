@@ -13,6 +13,7 @@ namespace ConventionalChangelog
     {
         private static readonly string COMMIT_PATTERN = @"^(\w*)(\(([\w\$\.\-\* ]*)\))?\: (.*)$";
         private static readonly int MAX_SUBJECT_LENGTH = 80;
+        private static readonly string BREAK_MSG = "**{0}:** due to {1}, {2}";
 
         private string _repoDir = ".";
 
@@ -169,14 +170,7 @@ namespace ConventionalChangelog
                  });
             }
 
-            var breaksRE = new Regex(@"/BREAKING CHANGE:\s(?<break>[\s\S]*)/");
-
-            var breakmatch = breaksRE.Match(raw).Groups["break"].Value;
-            if (!String.IsNullOrEmpty(breakmatch))
-            {
-                msg.Breaks.Add(breakmatch);
-            }
-
+            // Get the commit message info
             msg.Body = String.Join("\n", lines);
 
             var match = (new Regex(COMMIT_PATTERN)).Match(msg.Subject);
@@ -195,6 +189,24 @@ namespace ConventionalChangelog
             msg.Type = match.Groups[1].Value;
             msg.Component = match.Groups[3].Value;
             msg.Subject = subject;
+
+            // Get the breaking changes
+            var breaksRE = new Regex(@"BREAKING CHANGE:\s(?<break>[\s\S]*)");
+
+            var breakmatch = breaksRE.Match(raw).Groups["break"].Value;
+            if (!String.IsNullOrEmpty(breakmatch))
+            {
+                msg.Breaks.Add(String.Format(BREAK_MSG, msg.Component, msg.Hash.Substring(0, 8), breakmatch.Trim()));
+            }
+
+            //breaksRE.Matches(raw)
+            //    .Cast<Match>()
+            //    .Select(x => x.Groups["break"].Value)
+            //    .ToList()
+            //    .ForEach(x =>
+            //    {
+            //        if (!String.IsNullOrEmpty(x)) msg.Breaks.Add(x)
+            //    });
 
             return msg;
         }
@@ -235,6 +247,8 @@ namespace ConventionalChangelog
         {
             this.Hash = hash;
             this.Subject = subject;
+            Closes = new List<string>();
+            Breaks = new List<string>();
         }
     }
 }

@@ -43,6 +43,13 @@ namespace Tests
                         "I broke something oh no!",
                         "And I broke another thing!"
                     }
+                },
+                new CommitMessage() {
+                    Type = "feat",
+                    Component = "Main.cs",
+                    Hash = "123125125122a843a6cd161b634288c80335eaff",
+                    Body = "Another feature",
+                    Subject = "Main class feature #1"
                 }
             };
         }
@@ -60,7 +67,7 @@ namespace Tests
             Assert.True(changelog.Contains("Fixing README"));
             Assert.True(changelog.Contains("as8df6a"));
             Assert.True(changelog.Contains("Fixes"));
-            Assert.True(changelog.Contains("BREAKING CHANGES"));
+            Assert.True(changelog.Contains("Breaking Changes"));
             Assert.True(changelog.Contains("Features"));
         }
 
@@ -81,6 +88,7 @@ namespace Tests
             // "[{0}]({1}/commit/{2})";
             Assert.True(changelog.Contains("[as8df6a7](http://myrepo.com/commit/as8df6a768sh098asdh5asdh987asdh987asdh98)"));
         }
+
         #endregion
 
         #region Constructor Tests

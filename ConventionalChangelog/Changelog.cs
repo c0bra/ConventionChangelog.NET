@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO.Abstractions;
+using System.IO;
 
 namespace ConventionalChangelog
 {
@@ -52,7 +53,7 @@ namespace ConventionalChangelog
             string from = (!String.IsNullOrEmpty(tag)) ? tag : options.From;
 
 
-            var git = new Git();
+            var git = new Git(options.WorkingDirectory);
             var commits = git.GetCommits(from: from, to: options.To ?? "HEAD");
 
             WriteLog(commits, options);
@@ -65,10 +66,16 @@ namespace ConventionalChangelog
             {
                 Version = options.Version
             });
-            
-            string currentlog = fileSystem.File.ReadAllText(options.File, Encoding.UTF8);
 
-            fileSystem.File.WriteAllText(options.File, changelog + "\n" + currentlog, Encoding.UTF8);
+            string filePath = fileSystem.Path.Combine(options.WorkingDirectory, options.File);
+
+            string currentlog = "";
+            if (fileSystem.File.Exists(filePath))
+            {
+                currentlog = fileSystem.File.ReadAllText(filePath, Encoding.UTF8);
+            }
+
+            fileSystem.File.WriteAllText(filePath, changelog + "\n" + currentlog, Encoding.UTF8);
         }
     }
 
@@ -78,6 +85,7 @@ namespace ConventionalChangelog
         public string From { get; set; }
         public string To { get; set; }
         public string File { get; set; }
+        public string WorkingDirectory { get; set; }
         public string Subtitle { get; set; }
 
         public ChangelogOptions()
@@ -85,6 +93,7 @@ namespace ConventionalChangelog
             To = "HEAD";
             File = "CHANGELOG.md";
             Subtitle = "";
+            WorkingDirectory = ".";
         }
     }
 }

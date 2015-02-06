@@ -131,9 +131,6 @@ namespace ConventionalChangelog
 
             this.SectionLog = sectionLog;
             this.Options = options;
-
-            if (Options.IssueLink == null) Options.IssueLink = (Func<string, string>)((issue) => { return Writer.GetIssueLink(this.Options.Repository, issue); });
-            if (Options.CommitLink == null) Options.CommitLink = (Func<string, string>)((commit) => { return Writer.GetCommitLink(this.Options.Repository, commit); });
             /* TODO: Add getVersion and getPatchVersion?? */
         }
         #endregion
