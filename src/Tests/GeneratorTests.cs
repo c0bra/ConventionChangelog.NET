@@ -193,13 +193,13 @@ namespace Tests
         {
             var changelog = new Changelog(fileSystem);
 
-            fileSystem.File.WriteAllText("CHANGELOG.md", "This is previous stuff");
+            fileSystem.File.WriteAllText("CHANGELOG.md", "This is previou s stuff");
 
             changelog.Generate("1.0.1");
 
             var text = fileSystem.File.ReadAllText("CHANGELOG.md");
 
-            Assert.True(Regex.Match(text, @"1.0.1.+?\s+This is previous stuff").Success);
+            Assert.True(Regex.Match(text, @"1.0.1.+?\s+This is previous stuff", RegexOptions.IOg).Success); 
 
             // Cleanup changelog from local dir
             fileSystem.File.Delete("CHANGELOG.md");
