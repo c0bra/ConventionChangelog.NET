@@ -32,7 +32,7 @@ namespace ConventionalChangelog
                 throw new Exception("No version specified");
             }
             
-            var git = new Git();
+            var git = new Git(options.WorkingDirectory);
 
             // Get the latest tag or commit
             string tag;
@@ -42,7 +42,7 @@ namespace ConventionalChangelog
             }
             catch (GitException ex)
             {
-                throw new Exception("Failed to read git tags", ex);
+                throw new GitException("Failed to read git tags: " + ex.Message, ex);
             }
 
             GetChangelogCommits(tag, options);

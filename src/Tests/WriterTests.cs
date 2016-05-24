@@ -59,7 +59,7 @@ namespace Tests
         {
             string changelog = writer.WriteLog(basicCommitList, new WriterOptions() { Version = "1.2.3" });
 
-            Assert.IsNotNullOrEmpty(changelog);
+            Assert.False(String.IsNullOrEmpty(changelog));
 
             var lines = changelog.Split('\n');
             

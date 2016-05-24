@@ -20,6 +20,14 @@ namespace Tests
         Repository repo;
         string readmePath;
 
+        private string TestRepoChangelogPath
+        {
+            get
+            {
+                return fileSystem.Path.Combine(Util.TEST_REPO_DIR, "CHANGELOG.md");
+            }
+        }
+
         [SetUp]
         public void Setup()
         {
@@ -32,6 +40,10 @@ namespace Tests
         public void Cleanup()
         {
             Util.CleanupRepos();
+
+            // NOTE: this happens with the above command as the directory is removed
+            // Cleanup changelog from local dir
+            //fileSystem.File.Delete(TestRepoChangelogPath);
         }
 
         [Test]
@@ -63,7 +75,7 @@ namespace Tests
                 WorkingDirectory = Util.TEST_REPO_DIR
             });
 
-            var text = fileSystem.File.ReadAllText(fileSystem.Path.Combine(Util.TEST_REPO_DIR, "CHANGELOG.md"));
+            var text = fileSystem.File.ReadAllText(TestRepoChangelogPath);
 
             var lines = text.Split('\n');
 
@@ -93,7 +105,7 @@ namespace Tests
             Assert.True(lines[1].StartsWith("### 1.0.1"));
             Assert.True(lines[4].StartsWith("#### Bug Fixes"));
             Assert.True(lines[6].StartsWith("* **Bar:** Fixed something in Bar"));
-                Assert.True(lines[6].EndsWith("closes (#200))"));
+            Assert.True(lines[6].EndsWith("closes (#200))"));
             Assert.True(lines[9].StartsWith("#### Features"));
             Assert.True(lines[11].StartsWith("* **Foo:** Extended Foo"));
             Assert.True(Regex.Match(lines[11], @"\(\w{8}\)").Success);
@@ -107,6 +119,7 @@ namespace Tests
             // TODO: Add tests for breaking changes once their formatting is fixed
         }
 
+        [Ignore("Cannot pass only the version number when testing as the repo directory under test mode is not the current directory")]
         [Test]
         public void PassingOnlyVersionStringWorks()
         {
@@ -116,7 +129,7 @@ namespace Tests
 
             var text = fileSystem.File.ReadAllText("CHANGELOG.md");
 
-            Assert.IsNotNullOrEmpty(text);
+            Assert.False(String.IsNullOrEmpty(text));
             Assert.True(text.Contains("1.0.1"));
 
             // Cleanup changelog from local dir
@@ -160,7 +173,8 @@ namespace Tests
                 });
             });
 
-            Assert.True(ex.Message.Contains("Error running git commit"));
+            StringAssert.Contains("Failed to read git tags", ex.Message);
+            StringAssert.Contains("No commits found", ex.Message);
         }
 
         [Test]
@@ -182,27 +196,34 @@ namespace Tests
                 WorkingDirectory = Util.TEST_REPO_DIR
             });
 
-            var text = fileSystem.File.ReadAllText(fileSystem.Path.Combine(Util.TEST_REPO_DIR, "CHANGELOG.md"));
+            var text = fileSystem.File.ReadAllText(TestRepoChangelogPath);
 
             Assert.True(text.Contains("Foo feature"));
             Assert.False(text.Contains("Foo chore"));
         }
 
+        // Make sure the changelog generator doesn't remove previous content and only prepends
         [Test]
-        public void AppendsToChangelog()
+        public void PrependsToChangelog()
         {
+            // Set up the repo
+            File.AppendAllText(readmePath, "\nThis is for a fix commit");
+            repo.Index.Add("README.md");
+            repo.Commit("feat(Foo): Foo feature");
+
             var changelog = new Changelog(fileSystem);
 
-            fileSystem.File.WriteAllText("CHANGELOG.md", "This is previou s stuff");
+            fileSystem.File.WriteAllText(TestRepoChangelogPath, "This is previous stuff");
 
-            changelog.Generate("1.0.1");
+            changelog.Generate(new ChangelogOptions()
+            {
+                Version = "1.0.1",
+                WorkingDirectory = Util.TEST_REPO_DIR
+            });
 
-            var text = fileSystem.File.ReadAllText("CHANGELOG.md");
+            var text = fileSystem.File.ReadAllText(TestRepoChangelogPath);
 
-            Assert.True(Regex.Match(text, @"1.0.1.+?\s+This is previous stuff", RegexOptions.IOg).Success); 
-
-            // Cleanup changelog from local dir
-            fileSystem.File.Delete("CHANGELOG.md");
+            Assert.True(Regex.Match(text, @"1.0.1[\s\S]+?This is previous stuff", RegexOptions.IgnoreCase | RegexOptions.Multiline).Success);
         }
     }
 }
