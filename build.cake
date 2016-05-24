@@ -1,4 +1,4 @@
-﻿#addin "Cakge.Slack"
+﻿#addin "Cake.Slack"
 
 // NOTE: Can I add a reference post-build?
 // #r "./bin/Debug/ConventionalChangelog.dll"
